@@ -1,14 +1,14 @@
 @echo off
 setlocal EnableDelayedExpansion
+@REM @todo Move Explanations to read me
 @REM Why? Workspace and other files may want to be ignored, user has to set ignore files themselves
 @REM files to be ignored, like workspace, prevents for making a simple symlink for folder
-@REM not everything is wanted to be 
+@REM copy "hardlinktodata" "hardlinktosamedata" - cannot do this operation 
 
 rem user settable variables, manipulate these at your will
-set config_vault="E:\batch_programming\Test Obsidian\Obsidian_Config\"
+set "config_vault="
 rem use ; as separation between files
 set "ignorefiles=workspace.json;"
-
 rem arguments from command prompt
 set "project_vault="
 set /a Copyflag=0
@@ -34,7 +34,7 @@ if errorlevel %E_HELPOPERATION% (
 if errorlevel 1 (
     exit /b 1
 ) 
-
+rem note operation variable used :Filemanipulation 
 set "operation="
 if !Copyflag!==1 (
     set "operation=copy"
@@ -82,7 +82,7 @@ if !Helpflag!==1 (
     echo User may define variables for this script such as "configvault" and "ignorefiles".
     echo .obsidian at the end of the path is not required
     echo Will copy or hardlink all files and create directories recursively that are in .obsidian folder.
-    echo If file already exists, default behavior will ask y/n for every existing file
+    echo If a file already exists, default behavior will ask y/n for every existing file
     echo.
     echo CopyObsidianSettings.bat [/C] [/L] [/F] projectvault ^(configvault^)
     echo.
@@ -102,6 +102,17 @@ if !HardLinkflag!==1 if !Copyflag!==1 (
 if !Overrideflag!==1 if !OnlyNewFilesflag!==1 (
     echo Error: Cannot override and also create files that do not exist, use either /N or /F, not both
     exit /b %E_OPERATIONCONFLICT%
+)
+
+if not defined project_vault ( 
+    echo Error: "project_vault" variable is empty. 
+    echo Please give it as first argument that is a path to folder
+    exit /b %E_NONEXISTANTFOLDER%
+)
+if not defined config_vault ( 
+    echo Error: "config_vault" variable is empty. 
+    echo Please give it as second argument that is a path to folder or set it directly in this .bat script
+    exit /b %E_NONEXISTANTFOLDER%
 )
 
 call :ProcessPath config_vault
@@ -131,47 +142,89 @@ call set "%~1=!vault_loc!\"
 goto :eof
 
 :FileManipulation
+rem setlocal
 set sourcefilepath=%~1
 set destfilename=%~nx1
 set folder=%~p1
 set folder=!folder:*.obsidian\=!
-set destination=!project_vault!!folder!!destfilename!
+set "destination=!project_vault!!folder!!destfilename!"
 
 if not "!folder!"=="" if not exist "!project_vault!!folder!" mkdir "!project_vault!!folder!"
 call :FileIgnore !destfilename! result
 if !result!==1 goto :eof
 
-if !Copyflag!==1 ( 
-    if !OnlyNewFilesflag!==1 if exist !destination! goto :eof
-    !operation! "!sourcefilepath!" "!destination!" 
+set bOverride=0
+if !Copyflag!==1 (
+    set fulloperation=!operation! "!sourcefilepath!" "!destination!"
+
+    if not exist "!destination!" ( !fulloperation! & goto :eof )
+    if !OnlyNewFilesflag!==1  goto :eof
+
+    if !OverrideFlag!==1 (
+        !fulloperation!
+    ) else (
+        if !Allflag!==1 set "answerletter=Y"
+        if !Allflag!==0 (
+            call :PromptOverride "!destination!" bOverride Allflag
+            set "answerletter=N"
+            if !bOverride!==1 set "answerletter=Y"
+        )
+        rem copy gives error message even if given "N" with two hardlinks to same data
+        echo !answerletter! | copy "!sourcefilepath!" "!destination!" >nul 2>&1
+    )
+    rem failed, check if both are hardlinks to same data, copy operation fails in this case
+    if errorlevel 1 (
+        if !OverrideFlag!==1 goto :FileCopyErrorHandling
+        if /I "!answerletter!"=="Y" goto :FileCopyErrorHandling
+    ) else (
+        rem if /I !answerletter!=="N" echo something about 0 files copied
+        rem maybe generate some message about creation/override
+    )
+
+    goto :eof
 )
 if !HardLinkflag!==1 (
-    if !OnlyNewFilesflag!==1 if exist !destination! goto :eof
-    if not exist !destination!        !operation! "!destination!" "!sourcefilepath!" & goto :eof
+    set fulloperation=!operation! "!destination!" "!sourcefilepath!"
+    if !OnlyNewFilesflag!==1 if exist "!destination!" goto :eof
+    if not exist "!destination!" ( !fulloperation! & goto :eof )
 
     if !Overrideflag!==1 goto :FileOverride
     if !Allflag!==1 goto :FileOverride
-
-    set bOverride=0
     call :PromptOverride "!destination!" bOverride Allflag
     if !Allflag!==1 goto :FileOverride
     if !bOverride!==1 goto :FileOverride                     
 )
 goto :eof
+
 :FileOverride
 del "!destination!"
-!operation! "!destination!" "!sourcefilepath!"
+!fulloperation!
+exit /b 0
+
+:FileCopyErrorHandling
+
+rem check if these are hardlinks pointing to same data, and use delete
+set /a hardlinkcount=0
+for /f "delims=" %%H in ('fsutil hardlink list "!destination!"') do (
+    echo %%~H
+    set /a hardlinkcount+=1
+)
+rem do first delete then copy
+if !hardlinkcount! GEQ 2 (
+    goto :FileOverride
+)
 goto :eof
 
 :PromptOverride
+rem setlocal
 set /p answer=Override file %~1 (y/n/a)?
-if /I "%answer:~0,1%"=="a" call set /a "%~3=1" & goto :eof
+if /I "%answer:~0,1%"=="a" call set /a "%~3=1" & call set /a "%~2=1" & goto :eof
 if /I "%answer:~0,1%"=="y" call set /a "%~2=1" & goto :eof
 if /I "%answer:~0,1%"=="n" call set /a "%~2=0" & goto :eof
 goto :PromptOverride
 
 :FileIgnore
-set igs=!ignorefiles!
+set "igs=!ignorefiles!"
 set /a %2=0
 :NextFileIgnore
 for /f "delims=; tokens=1,*" %%A in ("!igs!") do (

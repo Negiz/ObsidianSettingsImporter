@@ -1,0 +1,5 @@
+hello here
+Another line of text
+will create a conflict
+
+This was also again modified, hope mummo doesn't touch this again
