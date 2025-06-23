@@ -1,15 +1,14 @@
 @echo off
 setlocal EnableDelayedExpansion
-@REM @todo Move Explanations to read me
-@REM Why? Workspace and other files may want to be ignored, user has to set ignore files themselves
-@REM files to be ignored, like workspace, prevents for making a simple symlink for folder
-@REM copy "hardlinktodata" "hardlinktosamedata" - cannot do this operation 
 
-rem user settable variables, manipulate these at your will
+rem USER SETTABLE VARIABLES, MANIPULATE THESE AT YOUR WILL
+rem vault where from user copies their settings. Can be given as second path argument
 set "config_vault="
+rem these files are not copied or hardlinked.
 rem use ; as separation between files
 set "ignorefiles=workspace.json;"
-rem arguments from command prompt
+
+rem ARGUMENTS FROM COMMAND PROMPT
 set "project_vault="
 set /a Copyflag=0
 set /a HardLinkflag=0
@@ -21,8 +20,9 @@ set /a E_OPERATIONCONFLICT=2
 set /a E_DRIVEMISSMATCH=3
 set /a E_NONEXISTANTFOLDER=4
 set /a E_HELPOPERATION=10
-rem GLOBALS
-set /a Allflag=0 & rem keeps count if user answers "All" when prompting existing files, for Hardlinks
+rem OTHER GLOBALS
+rem keeps count if user answers "All" when prompting existing files, for Hardlinks
+set /a Allflag=0 
 
 :main
 goto :ParseArgs
@@ -34,7 +34,7 @@ if errorlevel %E_HELPOPERATION% (
 if errorlevel 1 (
     exit /b 1
 ) 
-rem note operation variable used :Filemanipulation 
+rem operation variable used in :Filemanipulation 
 set "operation="
 if !Copyflag!==1 (
     set "operation=copy"
@@ -46,7 +46,6 @@ if !Copyflag!==1 (
 ) 
 if !HardLinkflag!==1 ( 
     set "operation=mklink /H"
-    rem force override deletes files
 )
 
 for /r "%config_vault%" %%F in (*) do (
@@ -61,8 +60,7 @@ set farg=%~1
 if "!farg:~0,1!"=="/" (
     call :SetFlag !farg!
 ) else (
-    if defined project_vault set config_vault=%~1
-    if not defined project_vault set project_vault=%~1
+    if not defined project_vault ( set project_vault=%~1) else ( set config_vault=%~1)
 )
 shift
 goto :ParseArgs
@@ -79,7 +77,7 @@ exit /b 0
 :ValidateAndProcessArgs
 if !Helpflag!==1 (
     echo Copies or creates hardlinks for settings in .obsidian folder in Obsidian projects. 
-    echo User may define variables for this script such as "configvault" and "ignorefiles".
+    echo User may define variables in this script such as "config_vault" and "ignorefiles".
     echo .obsidian at the end of the path is not required
     echo Will copy or hardlink all files and create directories recursively that are in .obsidian folder.
     echo If a file already exists, default behavior will ask y/n for every existing file
@@ -94,7 +92,7 @@ if !Helpflag!==1 (
     echo   configvault    Source for the files. ^(Optional if set in this .bat file^)
     exit /b %E_HELPOPERATION%
 )
-rem @todo permissions?
+
 if !HardLinkflag!==1 if !Copyflag!==1 (
     echo Error: Cannot make Hardlink and Copy operations at the same time, use either /C or /L, not both
     exit /b %E_OPERATIONCONFLICT%
@@ -169,18 +167,13 @@ if !Copyflag!==1 (
             set "answerletter=N"
             if !bOverride!==1 set "answerletter=Y"
         )
-        rem copy gives error message even if given "N" with two hardlinks to same data
         echo !answerletter! | copy "!sourcefilepath!" "!destination!" >nul 2>&1
     )
     rem failed, check if both are hardlinks to same data, copy operation fails in this case
     if errorlevel 1 (
         if !OverrideFlag!==1 goto :FileCopyErrorHandling
         if /I "!answerletter!"=="Y" goto :FileCopyErrorHandling
-    ) else (
-        rem if /I !answerletter!=="N" echo something about 0 files copied
-        rem maybe generate some message about creation/override
     )
-
     goto :eof
 )
 if !HardLinkflag!==1 (
@@ -202,8 +195,6 @@ del "!destination!"
 exit /b 0
 
 :FileCopyErrorHandling
-
-rem check if these are hardlinks pointing to same data, and use delete
 set /a hardlinkcount=0
 for /f "delims=" %%H in ('fsutil hardlink list "!destination!"') do (
     echo %%~H
@@ -216,7 +207,6 @@ if !hardlinkcount! GEQ 2 (
 goto :eof
 
 :PromptOverride
-rem setlocal
 set /p answer=Override file %~1 (y/n/a)?
 if /I "%answer:~0,1%"=="a" call set /a "%~3=1" & call set /a "%~2=1" & goto :eof
 if /I "%answer:~0,1%"=="y" call set /a "%~2=1" & goto :eof
