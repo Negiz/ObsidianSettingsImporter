@@ -1,4 +1,0 @@
-This is text from mummo
-Another mummo text lul
-This text is from main, we are creating a conflict
-Conflict was resolved here...
