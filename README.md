@@ -2,7 +2,7 @@
 Copy or hard link Obsidian settings from .obsidian folder to other
 
 ## Problem it solves
-In Obsidian one cannot specify a template that every Obsidian project uses.
+In [Obsidian](https://obsidian.md) notetaking tool one cannot specify a template that every Obsidian project uses.
 This means all settings in .obsidian need to be always copied manually to a new project.
 However, usually most of the projects use same shortcuts, css libraries, etc, so it 
 would be nice to have just one template which, if changed, all of the changes
@@ -54,3 +54,7 @@ Order doesn't matter with flags, but both path arguments need to be in order **f
 - Use **"** -symbols to cover the *"path\to\anypath"* if there are white spaces in the path. Batch interprets whitespace as end of an argument.
 - Some flags might conflict with each other, script notify with an error.
 - hard links between projects need to be in same drive/partition in the computer. Script notify with an error.
+
+## What is Obsidian
+For context [Obsidian](https://obsidian.md) is a note taking tool that users can tailor for their note-taking-needs. It is designed to be portable. A simple
+copy of some projects files to a new folder and you are good to go. This has limitations like all design choices, this script tries to relieve some pains caused by this - explained in above. 
